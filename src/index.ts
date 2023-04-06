@@ -74,7 +74,14 @@ const runTransaction = async (root: GosenNode, tx: TransactionCommand) => {
     }
 
     if ('fragment' in subCommand) {
-      nodes[subCommand.id] = [document.createDocumentFragment()]
+      const fr = document.createDocumentFragment()
+      const div = document.createElement('div')
+      div.innerHTML = subCommand.fragment
+      for (const child of div.childNodes) {
+        fr.appendChild(child)
+      }
+
+      nodes[subCommand.id] = [fr]
       continue
     }
 
