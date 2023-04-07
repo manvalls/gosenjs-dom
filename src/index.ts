@@ -361,20 +361,26 @@ const runTransaction = async (root: GosenNode, tx: TransactionCommand) => {
 
 }
 
+let lastExecution: Promise<void> = Promise.resolve()
+
 export const execute = async (root: GosenNode, commands: Command[]) => {
-  const routines: Record<number, Promise<void>> = {}
+  lastExecution = lastExecution.then(async () => {
+    const routines: Record<number, Promise<void>> = {}
 
-  for (const command of commands) {
-    if ('startRoutine' in command) {
-      routines[command.startRoutine] = routines[command.routine || 0] || Promise.resolve()
-      continue
+    for (const command of commands) {
+      if ('startRoutine' in command) {
+        routines[command.startRoutine] = routines[command.routine || 0] || Promise.resolve()
+        continue
+      }
+  
+      if ('tx' in command) {
+        routines[command.routine || 0] = (routines[command.routine || 0] || Promise.resolve()).then(() => runTransaction(root, command))
+        continue
+      }
     }
+  
+    await Promise.all(Object.values(routines))
+  })
 
-    if ('tx' in command) {
-      routines[command.routine || 0] = (routines[command.routine || 0] || Promise.resolve()).then(() => runTransaction(root, command))
-      continue
-    }
-  }
-
-  await Promise.all(Object.values(routines))
+  await lastExecution
 }
