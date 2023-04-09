@@ -361,10 +361,12 @@ const runTransaction = async (root: GosenNode, tx: TransactionCommand) => {
 
 }
 
-let lastExecution: Promise<void> = Promise.resolve()
+const lastExecution = '__GOSEN_LAST_EXECUTION__'
 
 export const execute = async (root: GosenNode, commands: Command[]) => {
-  lastExecution = lastExecution.then(async () => {
+  const w = 'defaultView' in root ? root.defaultView : root.ownerDocument.defaultView
+
+  w[lastExecution] = Promise.resolve(w[lastExecution]).then(async () => {
     const routines: Record<number, Promise<void>> = {}
 
     for (const command of commands) {
@@ -382,5 +384,5 @@ export const execute = async (root: GosenNode, commands: Command[]) => {
     await Promise.all(Object.values(routines))
   })
 
-  await lastExecution
+  await w[lastExecution]
 }
