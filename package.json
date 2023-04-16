@@ -24,6 +24,6 @@
     "typescript": "^5.0.4"
   },
   "dependencies": {
-    "@gosen/command-types": "^0.0.8"
+    "@gosen/command-types": "^0.0.9"
   }
 }
