@@ -363,26 +363,45 @@ const runTransaction = async (root: GosenNode, tx: TransactionCommand) => {
 
 const lastExecution = '__GOSEN_LAST_EXECUTION__'
 
+export class Thread {
+  private readonly root: GosenNode
+  private readonly routines: Record<number, Promise<void>> = {}
+
+  constructor(root: GosenNode) {
+    this.root = root
+  }
+
+  public async execute(commands: Command[]) {
+    const w = 'defaultView' in this.root ? this.root.defaultView : this.root.ownerDocument.defaultView
+
+    w[lastExecution] = Promise.resolve(w[lastExecution]).then(async () => {
+      for (const command of commands) {
+        if ('startRoutine' in command) {
+          this.routines[command.startRoutine] = this.routines[command.routine || 0] || Promise.resolve()
+          continue
+        }
+  
+        if ('endRoutine' in command) {
+          Promise.resolve(this.routines[command.endRoutine]).then(() => {
+            delete this.routines[command.endRoutine]
+          })
+          continue
+        }
+    
+        if ('tx' in command) {
+          this.routines[command.routine || 0] = (this.routines[command.routine || 0] || Promise.resolve()).then(() => runTransaction(this.root, command))
+          continue
+        }
+      }
+    
+      await Promise.all(Object.values(this.routines))
+    })
+  
+    await w[lastExecution]
+  }
+}
+
 export const execute = async (root: GosenNode, commands: Command[]) => {
-  const w = 'defaultView' in root ? root.defaultView : root.ownerDocument.defaultView
-
-  w[lastExecution] = Promise.resolve(w[lastExecution]).then(async () => {
-    const routines: Record<number, Promise<void>> = {}
-
-    for (const command of commands) {
-      if ('startRoutine' in command) {
-        routines[command.startRoutine] = routines[command.routine || 0] || Promise.resolve()
-        continue
-      }
-  
-      if ('tx' in command) {
-        routines[command.routine || 0] = (routines[command.routine || 0] || Promise.resolve()).then(() => runTransaction(root, command))
-        continue
-      }
-    }
-  
-    await Promise.all(Object.values(routines))
-  })
-
-  await w[lastExecution]
+  const thread = new Thread(root)
+  await thread.execute(commands)
 }
