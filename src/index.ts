@@ -6,7 +6,7 @@ type GosenNode = Element | Document | DocumentFragment | HTMLTemplateElement
 const mendScripts = (node: GosenNode) => {
   const scripts = getContainer(node).querySelectorAll('script')
   for (const script of scripts) {
-    const newScript = document.createElement('script')
+    const newScript = script.ownerDocument.createElement('script')
     for (const attr of script.attributes) {
       newScript.setAttribute(attr.name, attr.value)
     }
@@ -28,7 +28,7 @@ const extractContent = (node: GosenNode) => {
     return node.content
   }
 
-  const fragment = document.createDocumentFragment()
+  const fragment = node.ownerDocument.createDocumentFragment()
   for (const child of node.childNodes) {
     fragment.appendChild(child)
   }
@@ -42,6 +42,7 @@ const runTransaction = async (root: GosenNode, tx: TransactionCommand) => {
   nodes[0] = [root]
 
   const w = 'defaultView' in root ? root.defaultView : root.ownerDocument?.defaultView || window
+  const doc = root.ownerDocument || root as Document
   const onceMap = (w[onceSymbol] || (w[onceSymbol] = {})) as Record<string, boolean>
 
   if (tx.once && onceMap[tx.hash]) {
@@ -73,9 +74,25 @@ const runTransaction = async (root: GosenNode, tx: TransactionCommand) => {
       continue
     }
 
+    if ('elementId' in subCommand) {
+      const element = doc.getElementById(subCommand.elementId)
+      nodes[subCommand.id] = element ? [element] : []
+      continue
+    }
+
+    if ('head' in subCommand) {
+      nodes[subCommand.head] = [doc.head]
+      continue
+    }
+
+    if ('body' in subCommand) {
+      nodes[subCommand.body] = [doc.body]
+      continue
+    }
+
     if ('fragment' in subCommand) {
-      const fr = document.createDocumentFragment()
-      const div = document.createElement('div')
+      const fr = doc.createDocumentFragment()
+      const div = doc.createElement('div')
       div.innerHTML = subCommand.fragment
       for (const child of div.childNodes) {
         fr.appendChild(child)
@@ -171,7 +188,7 @@ const runTransaction = async (root: GosenNode, tx: TransactionCommand) => {
           if ('innerHTML' in node) {
             node.innerHTML = subCommand.html
           } else if (node instanceof DocumentFragment) {
-            const d = document.createElement('div')
+            const d = doc.createElement('div')
             d.innerHTML = subCommand.html
 
             while (node.firstChild) {
@@ -300,10 +317,10 @@ const runTransaction = async (root: GosenNode, tx: TransactionCommand) => {
     }
 
     if ('insertBefore' in subCommand) {
-      const d = document.createElement('div')
+      const d = doc.createElement('div')
       d.innerHTML = subCommand.insertBefore
 
-      const fragment = document.createDocumentFragment()
+      const fragment = doc.createDocumentFragment()
       for (const child of d.childNodes) {
         fragment.appendChild(child)
       }
@@ -341,10 +358,10 @@ const runTransaction = async (root: GosenNode, tx: TransactionCommand) => {
     }
 
     if ('append' in subCommand) {
-      const d = document.createElement('div')
+      const d = doc.createElement('div')
       d.innerHTML = subCommand.append
 
-      const fragment = document.createDocumentFragment()
+      const fragment = doc.createDocumentFragment()
       for (const child of d.childNodes) {
         fragment.appendChild(child)
       }
